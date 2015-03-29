@@ -1,0 +1,76 @@
+---
+title: "run_analysis"
+author: "Ahmed Assal"
+date: "Sunday, March 29, 2015"
+output: pdf_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+# install.packages("ff")
+# install.packages("ffbase")
+# 
+# require(ffbase)
+
+
+# Any package that is required by the script below is given here:
+# Check to see if packages are installed, if not install.
+inst_pkgs = load_pkgs =  c("ff","ffbase")
+inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+if(length(inst_pkgs)) install.packages(inst_pkgs)
+
+# Dynamically load packages
+pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+```
+
+```{r}
+# newsCorpusPath = "D:/Woking/Courses/Data Science/Data Science/The Data Science Specialization/Data Science Capstone Project/data/Coursera-SwiftKey/final/en_US"
+
+dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
+newsCorpusPath = "en_US.news.txt"
+blogsCorpusPath = "en_US.blogs.txt"
+twitterCorpusPath = "en_US.twitter.txt"
+
+```
+
+```{r}
+# bigdataset = read.csv.ffdf(file=paste0(dataCorporaPath, newsCorpusPath), first.rows=20000, colClasses=NA)
+sampleSize = 0.2
+readLines2function(fname) {
+ s = file.info( fname )$size 
+ buf = readChar( fname, s, useBytes=T)
+ strsplit( buf,"\r\n",fixed=T,useBytes=T)[[1]]
+}
+
+if (!file.exists("corpora.RData")){
+  newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusPath))
+  blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusPath))
+  twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusPath))
+  newsSamplesIndices = rbinom(length(newsCorpus),1,sampleSize)
+  newsSamples = newsCorpus[newsSamplesIndices]
+
+  blogsSamplesIndices = rbinom(length(blogsCorpus),1,sampleSize)
+  blogsSamples = blogsCorpus[blogsSamplesIndices]
+
+  twitterSamplesIndices = rbinom(length(twitterCorpus),1,sampleSize)
+  twitterSamples = twitterCorpus[twitterSamplesIndices]
+  save.image("corpora.RData")
+}
+rm(newsCorpusPath, blogsCorpusPath, twitterCorpusPath)
+rm(newsCorpus, blogsCorpus, twitterCorpus)
+rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
+
+
+
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
