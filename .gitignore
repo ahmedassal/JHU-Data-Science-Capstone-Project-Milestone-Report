@@ -2,3 +2,5 @@
 .Rhistory
 .RData
 corpora.RData
+run_analysis_cache
+final
