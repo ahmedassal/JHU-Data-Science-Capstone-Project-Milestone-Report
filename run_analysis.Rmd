@@ -1,76 +1,161 @@
 ---
-title: "run_analysis"
-author: "Ahmed Assal"
+title: "JHU Data Science Capstone Project - Milestone Report"
 date: "Sunday, March 29, 2015"
-output: pdf_document
+output:
+  html_document:
+    fig_caption: yes
+    number_sections: yes
+    theme: flatly
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
 ---
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+#Synopsis
+This report explains the explores the corpus, HC Corpora, from http://www.corpora.heliohost.org/ in preparation for the John Hopkins Data Science Capstone project. The project is a Shiny app that takes as input a phrase (multiple words) in a text box input and outputs a prediction of the next word. This document explains only the major features identified of the data including summary statistics about the data sets. It also reports any interesting findings that we amassed so far.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+In addition, the report elaborates our goals for the eventual app and algorithm and briefly summarize our plans for creating the prediction algorithm and Shiny app. It also serves as a basis for collecting feedback on our plans for creating a prediction algorithm and Shiny app.      
 
-```{r}
-# install.packages("ff")
-# install.packages("ffbase")
-# 
-# require(ffbase)
+#Data Processing   
 
-
-# Any package that is required by the script below is given here:
-# Check to see if packages are installed, if not install.
-inst_pkgs = load_pkgs =  c("ff","ffbase")
+##Loading packages    
+```{r packageLoading, echo=FALSE, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+inst_pkgs = load_pkgs =  c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr")
 inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
 if(length(inst_pkgs)) install.packages(inst_pkgs)
 
 # Dynamically load packages
 pkgs_loaded = lapply(load_pkgs, require, character.only=T)
 ```
+We used different R packages for producing report. More specifically:         
+* For text manipulation, we used: `r load_pkgs[3:4]`    
+* For text mining, we used: `r load_pkgs[0:2]`    
+* For data visualization, we used: `r load_pkgs[6]`      
 
-```{r}
-# newsCorpusPath = "D:/Woking/Courses/Data Science/Data Science/The Data Science Specialization/Data Science Capstone Project/data/Coursera-SwiftKey/final/en_US"
+##Downloading data
+[The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from [](www.corpora.heliohost.org). See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
 
-dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
-newsCorpusPath = "en_US.news.txt"
-blogsCorpusPath = "en_US.blogs.txt"
-twitterCorpusPath = "en_US.twitter.txt"
+```{r dataDownloading, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+dataURL = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+dataFile = "../../data/Coursera-SwiftKey.zip" 
 
+if(file.exists(dataFile)) {
+    message("File is already downloaded")
+} else {
+    download.file(dataURL, dataFile, method="wget")    
+}
 ```
 
-```{r}
-# bigdataset = read.csv.ffdf(file=paste0(dataCorporaPath, newsCorpusPath), first.rows=20000, colClasses=NA)
-sampleSize = 0.2
-readLines2function(fname) {
+The file downloaded had a large size of `r floor(file.info(dataFile)$size / 1024^2)`MB. After unzipping the file, we find the following directories:   
+```{r listDataDirectory, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+dataPath = "../../data/Coursera-SwiftKey/final/"
+list.files(dataPath)
+```    
+Each of them represent Corpora for a specific language. We will use English Corpora here for our proficiency with the English language.
+If we list the files in the english corpora directory, we see that it contains files for news, blogs and twitter.    
+
+```{r listDataFiles, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+engPath = "en_US/"
+list.files(paste0(dataPath, engPath))
+```    
+
+##Loading data   
+```{r, results='hide', cache=TRUE}
+dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
+newsCorpusFile = "en_US.news.txt"
+blogsCorpusFile = "en_US.blogs.txt"
+twitterCorpusFile = "en_US.twitter.txt"
+
+sampleSize = 0.00001
+
+readLines2=function(fname) {
  s = file.info( fname )$size 
  buf = readChar( fname, s, useBytes=T)
  strsplit( buf,"\r\n",fixed=T,useBytes=T)[[1]]
 }
 
-if (!file.exists("corpora.RData")){
-  newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusPath))
-  blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusPath))
-  twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusPath))
-  newsSamplesIndices = rbinom(length(newsCorpus),1,sampleSize)
-  newsSamples = newsCorpus[newsSamplesIndices]
+# if (!file.exists("corpora.RData")){
+  newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusFile))
+  blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusFile))
+  twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusFile))
+#   save.image("corpora.RData")
+# } else{
+#   load("corpora.RData")
+# }
+```
 
-  blogsSamplesIndices = rbinom(length(blogsCorpus),1,sampleSize)
-  blogsSamples = blogsCorpus[blogsSamplesIndices]
+```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+newsWords = stri_count_words(newsCorpus)
+blogsWords = stri_count_words(blogsCorpus)
+twitterWords = stri_count_words(twitterCorpus)
 
-  twitterSamplesIndices = rbinom(length(twitterCorpus),1,sampleSize)
-  twitterSamples = twitterCorpus[twitterSamplesIndices]
-  save.image("corpora.RData")
-}
-rm(newsCorpusPath, blogsCorpusPath, twitterCorpusPath)
+newsTotalWords = sum(newsWords)
+blogsTotalWords = sum(blogsWords)
+twitterTotalWords = sum(twitterWords)
+totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords)
+
+newsLines = length(newsWords)
+blogsLines = length(blogsWords)
+twitterLines = length(twitterWords)
+lines = c(blogsLines, newsLines, twitterLines)
+
+newsMean = mean(newsWords)
+blogsMean = mean(blogsWords)
+twitterMean = mean(twitterWords)
+means = c(blogsMean, newsMean, twitterMean)
+
+newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
+blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
+twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
+filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize)
+
+dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile)
+
+summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words = totalWords, lines = lines, mean_words = means)
+
+summaryStats
+
+rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
+```
+
+```{r sampling, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+
+newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
+blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
+twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
+samples = c(newsSamples, blogsSamples, twitterSamples)
+length(samples)
+```
+
+```{r preCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+
+rm(newsSamples, blogsSamples, twitterSamples)
 rm(newsCorpus, blogsCorpus, twitterCorpus)
 rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
+```
 
+```{r creatingTMCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+corpus = VCorpus(VectorSource(samples))
+# inspect(corpus)
+# length(corpus)
+```
+
+```{r postCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+rm(samples)
+
+```
+
+```{r preprocessCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+corpus = tm_map(corpus, removeNumbers) 
+corpus = tm_map(corpus, removePunctuation)
+corpus = tm_map(corpus, content_transformer(tolower))
+corpus = tm_map(corpus, removeWords, stopwords("english"))
+# corpus = tm_map(corpus, removeWords, profanities)
+corpus = tm_map(corpus, stripWhitespace)
+corpus = tm_map(corpus, stemDocument)
 
 
 ```
 
-You can also embed plots, for example:
-
-```{r, echo=FALSE}
-plot(cars)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+#Results
+#Conclusion
