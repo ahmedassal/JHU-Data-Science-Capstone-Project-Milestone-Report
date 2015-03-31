@@ -1,14 +1,15 @@
 ---
 title: "JHU Data Science Capstone Project - Milestone Report"
-date: "Sunday, March 29, 2015"
 output:
   html_document:
     fig_caption: yes
+    keep_md: yes
     number_sections: yes
     theme: flatly
   pdf_document:
     fig_caption: yes
     number_sections: yes
+date: "Sunday, March 29, 2015"
 ---
 
 #Synopsis
@@ -20,12 +21,16 @@ In addition, the report elaborates our goals for the eventual app and algorithm 
 
 ##Loading packages    
 ```{r packageLoading, echo=FALSE, results='hide', warning=FALSE, error=FALSE, message=FALSE}
-inst_pkgs = load_pkgs =  c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr")
-inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
-if(length(inst_pkgs)) install.packages(inst_pkgs)
+# inst_pkgs = load_pkgs =  c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr")
+# inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+# if(length(inst_pkgs)) install.packages(inst_pkgs)
+# 
+# # Dynamically load packages
+# pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+source("G:/DEV/R/library/packages.R")
 
-# Dynamically load packages
-pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+packages = c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr", "wordcloud", "RColorBrewer")
+setup_packages(packages)
 ```
 We used different R packages for producing report. More specifically:         
 * For text manipulation, we used: `r load_pkgs[3:4]`    
@@ -33,7 +38,7 @@ We used different R packages for producing report. More specifically:
 * For data visualization, we used: `r load_pkgs[6]`      
 
 ##Downloading data
-[The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from [](www.corpora.heliohost.org). See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
+[The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from www.corpora.heliohost.org . See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
 
 ```{r dataDownloading, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
 dataURL = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
@@ -60,13 +65,14 @@ list.files(paste0(dataPath, engPath))
 ```    
 
 ##Loading data   
-```{r, results='hide', cache=TRUE}
+
+```{r loadingData, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
 newsCorpusFile = "en_US.news.txt"
 blogsCorpusFile = "en_US.blogs.txt"
 twitterCorpusFile = "en_US.twitter.txt"
 
-sampleSize = 0.00001
+sampleSize = 0.1
 
 readLines2=function(fname) {
  s = file.info( fname )$size 
@@ -82,9 +88,11 @@ readLines2=function(fname) {
 # } else{
 #   load("corpora.RData")
 # }
+
 ```
 
-```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+
+```{r computingSummaryStats, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 newsWords = stri_count_words(newsCorpus)
 blogsWords = stri_count_words(blogsCorpus)
 twitterWords = stri_count_words(twitterCorpus)
@@ -92,33 +100,52 @@ twitterWords = stri_count_words(twitterCorpus)
 newsTotalWords = sum(newsWords)
 blogsTotalWords = sum(blogsWords)
 twitterTotalWords = sum(twitterWords)
-totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords)
+totalTotalWords = newsTotalWords + blogsTotalWords + twitterTotalWords
+totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords, totalTotalWords)
 
 newsLines = length(newsWords)
 blogsLines = length(blogsWords)
 twitterLines = length(twitterWords)
-lines = c(blogsLines, newsLines, twitterLines)
+totalLines = newsLines + blogsLines + twitterLines 
+lines = c(blogsLines, newsLines, twitterLines, totalLines)
 
 newsMean = mean(newsWords)
 blogsMean = mean(blogsWords)
 twitterMean = mean(twitterWords)
-means = c(blogsMean, newsMean, twitterMean)
+totalMean = mean(c(newsWords, blogsMean, twitterMean))
+means = c(blogsMean, newsMean, twitterMean, totalMean)
 
 newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
 blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
 twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
-filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize)
+totalFileSize = newsFileSize + blogsFileSize + twitterFileSize
+filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize, totalFileSize)
 
-dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile)
+dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile, "Total")
 
 summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words = totalWords, lines = lines, mean_words = means)
 
-summaryStats
+
 
 rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
+rm(newsFileSize, newsLines, newsMean, newsTotalWords, newsWords)
+rm(blogsFileSize, blogsLines, blogsMean, blogsTotalWords, blogsWords)
+rm(twitterFileSize, twitterLines, twitterMean, twitterTotalWords, twitterWords)
+
+```
+When loading all of the english Corpora in the data file, we are actually loading around `r round(sum(totalWords)/10^6)` million words in `r round((length(newsCorpus)+length(blogsCorpus)+length(twitterCorpus))/10^6)` million lines. That's about four times the size of the Encyclopedia Britannica.        
+
+![15th edition of the Britannica._Wikipedia._](http://cdn.afterdawn.com/v3/news/600x400/220px-Encyclopaedia_Britannica_15_with_2002.jpg)          
+
+##Data Features    
+
+###Summary Statistics
+To get a better sense of the size of this data, the following summary statistics elaborates the main features of the corpora.     
+```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+summaryStats
 ```
 
-```{r sampling, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+```{r sampling, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 
 newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
 blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
@@ -132,6 +159,10 @@ length(samples)
 rm(newsSamples, blogsSamples, twitterSamples)
 rm(newsCorpus, blogsCorpus, twitterCorpus)
 rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
+rm(totalFileSize, totalLines, totalMean, totalTotalWords, totalWords)
+rm(dataFilenames, packages)
+rm(filesSizes, lines, means)
+rm(dataCorporaPath, dataFile, dataPath, dataURL, engPath)
 ```
 
 ```{r creatingTMCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
@@ -142,7 +173,7 @@ corpus = VCorpus(VectorSource(samples))
 
 ```{r postCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 rm(samples)
-
+rm(summaryStats)
 ```
 
 ```{r preprocessCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
@@ -157,5 +188,90 @@ corpus = tm_map(corpus, stemDocument)
 
 ```
 
-#Results
+```{r computingTDM, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
+QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=4, max=4))
+
+getNGramFreqs <- function(tdm){
+    # Helper function to tabulate frequency
+    freqs <- sort(rowSums(as.matrix(tdm)), decreasing=TRUE)
+    NGramFreqs <- data.frame(word=names(freqs), frequency=freqs)
+    return(NGramFreqs)
+}
+
+unigramTDM_sparse <- TermDocumentMatrix(corpus)
+unigramTDM <- removeSparseTerms(unigramTDM_sparse, 0.99)
+rm(unigramTDM_sparse)
+unigramFreqs <- getNGramFreqs(unigramTDM)
+```      
+
+###Word Cloud of Most Frequent Unigrams (1 word)     
+
+```{r drawUgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+# glimpse(unigramFreqs)
+wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud1.png", width=12, height=8, units="in", res=300)
+# wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=100, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```
+
+```{r computeBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+bigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=BigramTokenizer))
+bigramTDM <- removeSparseTerms(bigramTDM_sparse, 0.999)
+rm(bigramTDM_sparse)
+bigramFreqs <- getNGramFreqs(bigramTDM)
+# glimpse(bigramFreqs)
+```
+
+###Word Cloud of Most Frequent Bigrams (2 words)           
+
+```{r drawBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud2.png", width=12, height=8, units="in", res=300)
+# wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```
+
+```{r computeTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+trigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=TrigramTokenizer))
+trigramTDM <- removeSparseTerms(trigramTDM_sparse, 0.9999)
+rm(trigramTDM_sparse)
+trigramFreqs <- getNGramFreqs(trigramTDM)
+# glimpse(trigramFreqs)
+```     
+
+###Word Cloud of Most Frequent Trigrams (3 words)       
+
+```{r drawTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud3.png", width=12, height=8, units="in", res=300)
+# wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```
+
+```{r computeQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+quadgramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=QuadgramTokenizer))
+quadgramTDM <- removeSparseTerms(quadgramTDM_sparse, 0.9999)
+rm(quadgramTDM_sparse)
+quadgramFreqs <- getNGramFreqs(quadgramTDM)
+# glimpse(quadgramFreqs)
+```    
+
+###Word Cloud of Most Frequent Quadgrams (4 words)       
+
+```{r drawQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(1.0,.01), max.words=220, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud4.png", width=12, height=8, units="in", res=300)
+# wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# dev.off()
+```
+
+```{r postWcClean, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+
+rm(corpus)
+```     
+
+#Shiny App Strategy     
+
 #Conclusion
