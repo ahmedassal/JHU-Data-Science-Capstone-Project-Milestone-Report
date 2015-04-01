@@ -4,3 +4,13 @@
 corpora.RData
 run_analysis_cache
 final
+1bigramFreqs.RData
+1corpus1.RData
+1corpus2.RData
+1quadgramFreqs.RData
+1samples.RData
+1sumstats.RData
+1text.RData
+1trigramFreqs.RData
+1unigramFreqs.RData
+run_analysis_files

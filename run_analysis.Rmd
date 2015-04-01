@@ -68,11 +68,13 @@ list.files(paste0(dataPath, engPath))
 
 ```{r loadingData, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
+dataProfanityWordsPath = "../../data/"
 newsCorpusFile = "en_US.news.txt"
 blogsCorpusFile = "en_US.blogs.txt"
 twitterCorpusFile = "en_US.twitter.txt"
+profanityWordsFile = "bad-words(CMU).txt"
 
-sampleSize = 0.1
+sampleSize = 0.01
 
 readLines2=function(fname) {
  s = file.info( fname )$size 
@@ -80,78 +82,87 @@ readLines2=function(fname) {
  strsplit( buf,"\r\n",fixed=T,useBytes=T)[[1]]
 }
 
-# if (!file.exists("corpora.RData")){
+if (!file.exists("1text.RData")){
   newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusFile))
   blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusFile))
   twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusFile))
-#   save.image("corpora.RData")
-# } else{
-#   load("corpora.RData")
-# }
+  profanityWords= readLines2(fname=paste0(dataProfanityWordsPath, profanityWordsFile))
+  save(newsCorpus, blogsCorpus, twitterCorpus, profanityWords, file="1text.RData")
+} else{
+  load("1text.RData")
+}
 
 ```
 
 
 ```{r computingSummaryStats, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
-newsWords = stri_count_words(newsCorpus)
-blogsWords = stri_count_words(blogsCorpus)
-twitterWords = stri_count_words(twitterCorpus)
+if (!file.exists("1sumstats.RData")){
+  newsWords = stri_count_words(newsCorpus)
+  blogsWords = stri_count_words(blogsCorpus)
+  twitterWords = stri_count_words(twitterCorpus)
+  
+  newsTotalWords = sum(newsWords)
+  blogsTotalWords = sum(blogsWords)
+  twitterTotalWords = sum(twitterWords)
+  totalTotalWords = newsTotalWords + blogsTotalWords + twitterTotalWords
+  totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords, totalTotalWords)
+  
+  newsLines = length(newsWords)
+  blogsLines = length(blogsWords)
+  twitterLines = length(twitterWords)
+  totalLines = newsLines + blogsLines + twitterLines 
+  lines = c(blogsLines, newsLines, twitterLines, totalLines)
+  
+  newsMean = mean(newsWords)
+  blogsMean = mean(blogsWords)
+  twitterMean = mean(twitterWords)
+  totalMean = mean(c(newsWords, blogsMean, twitterMean))
+  means = c(blogsMean, newsMean, twitterMean, totalMean)
+  
+  newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
+  blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
+  twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
+  totalFileSize = newsFileSize + blogsFileSize + twitterFileSize
+  filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize, totalFileSize)
+  
+  dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile, "Total")
+  
+  summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words =   totalWords, lines = lines, mean_words = means)
+  save(summaryStats, totalWords, file="1sumstats.RData")
+} else {
+  load(file="1sumstats.RData")
+}
 
-newsTotalWords = sum(newsWords)
-blogsTotalWords = sum(blogsWords)
-twitterTotalWords = sum(twitterWords)
-totalTotalWords = newsTotalWords + blogsTotalWords + twitterTotalWords
-totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords, totalTotalWords)
-
-newsLines = length(newsWords)
-blogsLines = length(blogsWords)
-twitterLines = length(twitterWords)
-totalLines = newsLines + blogsLines + twitterLines 
-lines = c(blogsLines, newsLines, twitterLines, totalLines)
-
-newsMean = mean(newsWords)
-blogsMean = mean(blogsWords)
-twitterMean = mean(twitterWords)
-totalMean = mean(c(newsWords, blogsMean, twitterMean))
-means = c(blogsMean, newsMean, twitterMean, totalMean)
-
-newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
-blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
-twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
-totalFileSize = newsFileSize + blogsFileSize + twitterFileSize
-filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize, totalFileSize)
-
-dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile, "Total")
-
-summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words = totalWords, lines = lines, mean_words = means)
-
-
-
-rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
-rm(newsFileSize, newsLines, newsMean, newsTotalWords, newsWords)
-rm(blogsFileSize, blogsLines, blogsMean, blogsTotalWords, blogsWords)
-rm(twitterFileSize, twitterLines, twitterMean, twitterTotalWords, twitterWords)
-
+  rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
+  rm(newsFileSize, newsLines, newsMean, newsTotalWords, newsWords)
+  rm(blogsFileSize, blogsLines, blogsMean, blogsTotalWords, blogsWords)
+  rm(twitterFileSize, twitterLines, twitterMean, twitterTotalWords, twitterWords)
 ```
 When loading all of the english Corpora in the data file, we are actually loading around `r round(sum(totalWords)/10^6)` million words in `r round((length(newsCorpus)+length(blogsCorpus)+length(twitterCorpus))/10^6)` million lines. That's about four times the size of the Encyclopedia Britannica.        
 
 ![15th edition of the Britannica._Wikipedia._](http://cdn.afterdawn.com/v3/news/600x400/220px-Encyclopaedia_Britannica_15_with_2002.jpg)          
 
-##Data Features    
+##Data Features and Summary Statistics     
 
-###Summary Statistics
 To get a better sense of the size of this data, the following summary statistics elaborates the main features of the corpora.     
 ```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 summaryStats
 ```
 
-```{r sampling, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+##Data Sampling    
+Beacause the data size is too large which has resulted in many slowdowns and freezes in the computer while exploring the data, I have taken a sample  that constitutes 10% of the original data. 10% of each of the files downloaded for the english corpora, the number of lines of the sample is around 200,000 lines verses 2,000,000 lines for the original corpora.    
 
-newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
-blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
-twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
-samples = c(newsSamples, blogsSamples, twitterSamples)
-length(samples)
+```{r sampling, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+if (!file.exists("1samples.RData")){
+  newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
+  blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
+  twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
+  samples = c(newsSamples, blogsSamples, twitterSamples)
+#   length(samples)
+  save(samples, file= "1samples.RData")
+} else {
+  load("1samples.RData")
+}
 ```
 
 ```{r preCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
@@ -162,31 +173,54 @@ rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
 rm(totalFileSize, totalLines, totalMean, totalTotalWords, totalWords)
 rm(dataFilenames, packages)
 rm(filesSizes, lines, means)
-rm(dataCorporaPath, dataFile, dataPath, dataURL, engPath)
+rm(dataCorporaPath, dataFile, dataPath, dataURL, engPath, dataProfanityWordsPath, profanityWordsFile)
 ```
 
 ```{r creatingTMCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
-corpus = VCorpus(VectorSource(samples))
-# inspect(corpus)
-# length(corpus)
+if (!file.exists("1corpus1.RData")){
+  corpus = VCorpus(VectorSource(samples))
+  # inspect(corpus)
+  # length(corpus)
+  save(corpus, file="1corpus1.RData")
+} else {
+  load("1corpus1.RData")
+}
 ```
 
 ```{r postCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 rm(samples)
 rm(summaryStats)
 ```
-
+## Data Cleaning
+Before delving into tokenization of the corpora, i.e. extracting the unique n-gram words or phrases,  we will clean the corpora through the following transofrmations:
+  1- Converting the corpora text into UTF-8 encoding.    
+  2- Removing numbers.    
+  3- Removing unnecessary punctuation.    
+  4- Optionally removing English stopwords, we might cancel this step later as we progress as it       may affect the perfromance of our predictive model.     
+  5- Optionally removing profanity words, we might cancel this step later as we progress as it       may affect the perfromance of our predictive model. 
+  6- Converting all alphabetical characters into lowercase.    
+  7- Removing extra white space such as tab, etc...    
+  8- Stemming the different words, i.e. removing any suffixes such ing, er, s, etc...     
+  9- Converting the text into plain text document.     
+  
 ```{r preprocessCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
-corpus = tm_map(corpus, removeNumbers) 
-corpus = tm_map(corpus, removePunctuation)
-corpus = tm_map(corpus, content_transformer(tolower))
-corpus = tm_map(corpus, removeWords, stopwords("english"))
-# corpus = tm_map(corpus, removeWords, profanities)
-corpus = tm_map(corpus, stripWhitespace)
-corpus = tm_map(corpus, stemDocument)
+if (!file.exists("1corpus2.RData")){
+  corpus = tm_map(corpus, function(c) iconv(c, to="UTF-8", sub=" ") )
+  corpus = tm_map(corpus, removeNumbers) 
+  corpus = tm_map(corpus, removePunctuation)
+  corpus = tm_map(corpus, removeWords, stopwords("english"))
+  corpus = tm_map(corpus, removeWords, profanityWords)
+  corpus = tm_map(corpus, stripWhitespace)
+  corpus = tm_map(corpus, stemDocument)
+  corpus = tm_map(corpus, PlainTextDocument)
+  corpus = tm_map(corpus, content_transformer(tolower))
+  save(corpus, file= "1corpus2.RData")
+} else {
+  load(file = "1corpus2.RData")
+}
+```     
 
-
-```
+## Corpora Tokenization     
 
 ```{r computingTDM, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
@@ -199,16 +233,23 @@ getNGramFreqs <- function(tdm){
     NGramFreqs <- data.frame(word=names(freqs), frequency=freqs)
     return(NGramFreqs)
 }
-
-unigramTDM_sparse <- TermDocumentMatrix(corpus)
-unigramTDM <- removeSparseTerms(unigramTDM_sparse, 0.99)
-rm(unigramTDM_sparse)
-unigramFreqs <- getNGramFreqs(unigramTDM)
+if (!file.exists("1unigramFreqs.RData")){
+  unigramTDM_sparse <- TermDocumentMatrix(corpus)
+  unigramTDM <- removeSparseTerms(unigramTDM_sparse, 0.99)
+  rm(unigramTDM_sparse)
+  unigramFreqs <- getNGramFreqs(unigramTDM)
+  save(unigramFreqs, file= "1unigramFreqs.RData")
+} else {
+  load("1unigramFreqs.RData")
+}
 ```      
 
-###Word Cloud of Most Frequent Unigrams (1 word)     
+###Most Frequent Unigrams (1 word)       
 
-```{r drawUgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+####Bigrams Word Cloud      
+The word cloud shows the most common unigrams larger in scale.      
+         
+```{r dUgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 # glimpse(unigramFreqs)
 wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
 # png("MachineLearningCloud1.png", width=12, height=8, units="in", res=300)
@@ -216,56 +257,129 @@ wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=20
 # dev.off()
 ```
 
-```{r computeBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
-bigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=BigramTokenizer))
-bigramTDM <- removeSparseTerms(bigramTDM_sparse, 0.999)
-rm(bigramTDM_sparse)
-bigramFreqs <- getNGramFreqs(bigramTDM)
+####Unigrams Histogram      
+The histogram shows the different frequencies of the top unigrams.   
+
+```{r dUgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+ggplot(unigramFreqs[1:30,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+  theme(axis.text.x=element_text(angle=65,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "test", title="Top 30 Unigrams Frequencies in The Copora")
+```      
+
+
+```{r cBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+if (!file.exists("1bigramFreqs.RData")){
+  bigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=BigramTokenizer))
+  bigramTDM <- removeSparseTerms(bigramTDM_sparse, 0.999)
+  rm(bigramTDM_sparse)
+  bigramFreqs <- getNGramFreqs(bigramTDM)
+  save(bigramFreqs, file = "1bigramFreqs.RData")
+} else {
+  load("1bigramFreqs.RData")
+}
 # glimpse(bigramFreqs)
 ```
 
-###Word Cloud of Most Frequent Bigrams (2 words)           
+###Most Frequent Bigrams (2 words)       
 
-```{r drawBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+####Bigrams Word Cloud      
+The word cloud shows the most common bigrams larger in scale.      
+         
+
+```{r dBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
 # png("MachineLearningCloud2.png", width=12, height=8, units="in", res=300)
 # wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
 # dev.off()
 ```
 
-```{r computeTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
-trigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=TrigramTokenizer))
-trigramTDM <- removeSparseTerms(trigramTDM_sparse, 0.9999)
-rm(trigramTDM_sparse)
-trigramFreqs <- getNGramFreqs(trigramTDM)
-# glimpse(trigramFreqs)
+####Bigrams Histogram      
+The histogram shows the different frequencies of the top bigrams.   
+
+```{r dBgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+ggplot(bigramFreqs[1:25,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+    theme(axis.text.x=element_text(angle=35,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "test", title="Top 25 Bigrams Frequencies in The Copora")
+```      
+
+```{r cTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+if (!file.exists("1trigramFreqs.RData")){
+  trigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=TrigramTokenizer))
+  trigramTDM <- removeSparseTerms(trigramTDM_sparse, 0.9999)
+  rm(trigramTDM_sparse)
+  trigramFreqs <- getNGramFreqs(trigramTDM)
+  save(trigramFreqs, file = "1trigramFreqs.RData")
+  # glimpse(trigramFreqs)
+} else {
+  load("1trigramFreqs.RData")
+}
 ```     
 
-###Word Cloud of Most Frequent Trigrams (3 words)       
+###Most Frequent Trigrams (3 words)       
 
-```{r drawTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+####Trigrams Word Cloud      
+The word cloud shows the most common trigrams larger in scale.      
+
+```{r dTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
 # png("MachineLearningCloud3.png", width=12, height=8, units="in", res=300)
 # wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
 # dev.off()
-```
+```      
 
-```{r computeQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
-quadgramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=QuadgramTokenizer))
-quadgramTDM <- removeSparseTerms(quadgramTDM_sparse, 0.9999)
-rm(quadgramTDM_sparse)
-quadgramFreqs <- getNGramFreqs(quadgramTDM)
-# glimpse(quadgramFreqs)
+####Trigrams Histogram      
+The histogram shows the different frequencies of the top trigrams.    
+
+```{r dTgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+ggplot(trigramFreqs[1:20,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+  theme(axis.text.x=element_text(angle=30,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "test", title="Top 20 Trigrams Frequencies in The Copora")
+```      
+
+```{r cQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+if (!file.exists("1quadgramFreqs.RData")){
+  quadgramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=QuadgramTokenizer))
+  quadgramTDM <- removeSparseTerms(quadgramTDM_sparse, 0.9999)
+  rm(quadgramTDM_sparse)
+  quadgramFreqs <- getNGramFreqs(quadgramTDM)
+  # glimpse(quadgramFreqs)
+  save(quadgramFreqs, file = "1quadgramFreqs.RData")
+} else {
+  load("1quadgramFreqs.RData")
+}
 ```    
 
-###Word Cloud of Most Frequent Quadgrams (4 words)       
+###Most Frequent Quadgrams (4 words)       
 
-```{r drawQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
-wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(1.0,.01), max.words=220, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+####Quadgrams Word Cloud      
+The word cloud shows the most common quadgrams larger in scale.     
+
+```{r dQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(2.0,.1),max.words=100, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE, rot.per = 0.35)
 # png("MachineLearningCloud4.png", width=12, height=8, units="in", res=300)
 # wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
 # dev.off()
-```
+```     
+
+####Quadgrams Histogram      
+The histogram shows the different frequencies of the top quadgrams.    
+
+```{r dQgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+ggplot(quadgramFreqs[1:15,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_grey()+
+    theme(axis.text.x=element_text(angle=25,size=10,hjust=1))+
+    labs(y="Frequency", x= "test", title="Top 15 Quadgrams Frequencies in The Copora")
+```      
 
 ```{r postWcClean, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
 
