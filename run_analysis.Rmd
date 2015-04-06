@@ -1,15 +1,15 @@
 ---
 title: "JHU Data Science Capstone Project - Milestone Report"
 output:
-  word_document: default
-  pdf_document:
-    fig_caption: yes
-    number_sections: yes
   html_document:
     fig_caption: yes
     keep_md: yes
     number_sections: yes
     theme: flatly
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  word_document: default
 date: "Sunday, March 29, 2015"
 ---
 
@@ -383,64 +383,56 @@ ggplot(quadgramFreqs[1:15,], aes(x=reorder(word,order(frequency, decreasing = TR
 ```      
 
 ```{r postWcClean, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
-quiz2Strings = c("The guy in front of me just bought a pound of bacon, a bouquet, and a case of",    "You're the reason why I smile everyday. Can you follow me please? It would mean the",                  "Hey sunshine, can you follow me and make me the", "Very early observations on the Bills game: Offense still struggling but the", "Go on a romantic date at the", "Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my", "Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some", "After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little", "Be grateful for the good times and keep the faith during the", "If this isn't the cutest thing you've ever seen, then you must be")
-length(quiz2Strings)
+# quiz2Strings = c("The guy in front of me just bought a pound of bacon, a bouquet, and a case of",    "You're the reason why I smile everyday. Can you follow me please? It would mean the",                  "Hey sunshine, can you follow me and make me the", "Very early observations on the Bills game: Offense still struggling but the", "Go on a romantic date at the", "Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my", "Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some", "After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little", "Be grateful for the good times and keep the faith during the", "If this isn't the cutest thing you've ever seen, then you must be")
+# length(quiz2Strings)
 
 
-quiz3Strings = c("",
-                 "",
-                 "",
-                 "",
-                 "",
-                 "",
-                 "",
-                 "",
-                 "",)
-quiz2Corpus = VCorpus(VectorSource(quiz2Strings))
-inspect(quiz2Corpus)
-quiz2Corpus[[2]]
-word(quiz2Strings[[2]], -3,-1)
-quiz2Corpus = tm_map(quiz2Corpus, function(c) iconv(c, to="UTF-8", sub=" ") )
-  quiz2Corpus = tm_map(quiz2Corpus, removeNumbers) 
-  quiz2Corpus = tm_map(quiz2Corpus, removePunctuation)
-  quiz2Corpus = tm_map(quiz2Corpus, removeWords, stopwords("english"))
-  quiz2Corpus = tm_map(quiz2Corpus, removeWords, profanityWords)
-  quiz2Corpus = tm_map(quiz2Corpus, stripWhitespace)
-  quiz2Corpus = tm_map(quiz2Corpus, stemDocument)
-  quiz2Corpus = tm_map(quiz2Corpus, PlainTextDocument)
-  quiz2Corpus = tm_map(quiz2Corpus, content_transformer(tolower))
-  inspect(quiz2Corpus)
-  quiz2Corpus[[1]]$content
-  
-  
-  recommend <- function (pattern) {
-    quadTest = word(pattern, -4,-2)
-    quadTest  
-    quadgramFreqs[which(str_detect(quadgramFreqs$word, fixed(quadTest)) == TRUE),]
-    
-    triTest = word(pattern, -3,-2)
-    triTest  
-    trigramFreqs[which(str_detect(trigramFreqs$word, fixed(triTest)) == TRUE),]
-  
-    biTest = word(pattern, -2,-2)
-    biTest  
-    bigramFreqs[which(str_detect(bigramFreqs$word, fixed(biTest)) == TRUE),]
-  }
-  
-  pattern1 = quiz2Corpus[[1]]$content
-  recommend(pattern1)
 
-  pattern2 = quiz2Corpus[[2]]$content
-  recommend(pattern2)
-
-  pattern3 = quiz2Corpus[[3]]$content
-  recommend(pattern3)
-
-  str(quiz2Corpus)
-  summary(quiz2Corpus)
-  
-  findFreqTerms(quadgramTDM, 2000)
-rm(corpus)
+# quiz2Corpus = VCorpus(VectorSource(quiz2Strings))
+# inspect(quiz2Corpus)
+# quiz2Corpus[[2]]
+# word(quiz2Strings[[2]], -3,-1)
+# quiz2Corpus = tm_map(quiz2Corpus, function(c) iconv(c, to="UTF-8", sub=" ") )
+#   quiz2Corpus = tm_map(quiz2Corpus, removeNumbers) 
+#   quiz2Corpus = tm_map(quiz2Corpus, removePunctuation)
+#   quiz2Corpus = tm_map(quiz2Corpus, removeWords, stopwords("english"))
+#   quiz2Corpus = tm_map(quiz2Corpus, removeWords, profanityWords)
+#   quiz2Corpus = tm_map(quiz2Corpus, stripWhitespace)
+#   quiz2Corpus = tm_map(quiz2Corpus, stemDocument)
+#   quiz2Corpus = tm_map(quiz2Corpus, PlainTextDocument)
+#   quiz2Corpus = tm_map(quiz2Corpus, content_transformer(tolower))
+#   inspect(quiz2Corpus)
+#   quiz2Corpus[[1]]$content
+#   
+#   
+#   recommend <- function (pattern) {
+#     quadTest = word(pattern, -4,-2)
+#     quadTest  
+#     quadgramFreqs[which(str_detect(quadgramFreqs$word, fixed(quadTest)) == TRUE),]
+#     
+#     triTest = word(pattern, -3,-2)
+#     triTest  
+#     trigramFreqs[which(str_detect(trigramFreqs$word, fixed(triTest)) == TRUE),]
+#   
+#     biTest = word(pattern, -2,-2)
+#     biTest  
+#     bigramFreqs[which(str_detect(bigramFreqs$word, fixed(biTest)) == TRUE),]
+#   }
+#   
+#   pattern1 = quiz2Corpus[[1]]$content
+#   recommend(pattern1)
+# 
+#   pattern2 = quiz2Corpus[[2]]$content
+#   recommend(pattern2)
+# 
+#   pattern3 = quiz2Corpus[[3]]$content
+#   recommend(pattern3)
+# 
+#   str(quiz2Corpus)
+#   summary(quiz2Corpus)
+#   
+#   findFreqTerms(quadgramTDM, 2000)
+# rm(corpus)
 ```     
 #Shiny App    
 ##Text Prediction Strategy     
