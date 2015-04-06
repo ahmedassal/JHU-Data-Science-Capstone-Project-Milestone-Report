@@ -1,0 +1,464 @@
+---
+title: "JHU Data Science Capstone Project - Milestone Report"
+output:
+  word_document: default
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  html_document:
+    fig_caption: yes
+    keep_md: yes
+    number_sections: yes
+    theme: flatly
+date: "Sunday, March 29, 2015"
+---
+
+#Synopsis
+This report explores the corpus, HC Corpora, from http://www.corpora.heliohost.org/ in preparation for the John Hopkins Data Science Capstone project. The project is a Shiny app that takes as input a phrase (multiple words) in a text box input and outputs a prediction of the next word. This document explains only the major features identified of the data including summary statistics about the data sets. It also reports any interesting findings that we amassed so far.
+
+In addition, the report elaborates our goals for the eventual app and algorithm and briefly summarize our plans for creating the prediction algorithm and Shiny app. It also serves as a basis for collecting feedback on our plans for creating a prediction algorithm and Shiny app.      
+
+#Data Processing   
+
+##Loading packages    
+```{r packageLoading, echo=FALSE, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+# inst_pkgs = load_pkgs =  c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr")
+# inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+# if(length(inst_pkgs)) install.packages(inst_pkgs)
+# 
+# # Dynamically load packages
+# pkgs_loaded = lapply(load_pkgs, require, character.only=T)
+source("G:/DEV/R/library/packages.R")
+
+packages = c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr", "wordcloud", "RColorBrewer")
+setup_packages(packages)
+```
+We used different R packages for producing report. More specifically:         
+* For text manipulation, we used: `r load_pkgs[3:4]`    
+* For text mining, we used: `r load_pkgs[0:2]`    
+* For data visualization, we used: `r load_pkgs[6]`      
+
+##Downloading data
+[The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from www.corpora.heliohost.org . See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
+
+```{r dataDownloading, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+dataURL = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+dataFile = "../../data/Coursera-SwiftKey.zip" 
+
+if(file.exists(dataFile)) {
+    message("File is already downloaded")
+} else {
+    download.file(dataURL, dataFile, method="wget")    
+}
+```
+
+The file downloaded had a large size of `r floor(file.info(dataFile)$size / 1024^2)`MB. After unzipping the file, we find the following directories:   
+```{r listDataDirectory, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+dataPath = "../../data/Coursera-SwiftKey/final/"
+list.files(dataPath)
+```    
+Each of them represent Corpora for a specific language. We will use English Corpora here for our proficiency with the English language.
+If we list the files in the english corpora directory, we see that it contains files for news, blogs and twitter.    
+
+```{r listDataFiles, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+engPath = "en_US/"
+list.files(paste0(dataPath, engPath))
+```    
+
+##Loading data   
+
+```{r loadingData, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
+dataProfanityWordsPath = "../../data/"
+newsCorpusFile = "en_US.news.txt"
+blogsCorpusFile = "en_US.blogs.txt"
+twitterCorpusFile = "en_US.twitter.txt"
+profanityWordsFile = "bad-words(CMU).txt"
+
+sampleSize = 0.1
+
+readLines2=function(fname) {
+ s = file.info( fname )$size 
+ buf = readChar( fname, s, useBytes=T)
+ strsplit( buf,"\r\n",fixed=T,useBytes=T)[[1]]
+}
+
+if (!file.exists("1text.RData")){
+  newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusFile))
+  blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusFile))
+  twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusFile))
+  profanityWords= readLines2(fname=paste0(dataProfanityWordsPath, profanityWordsFile))
+  save(newsCorpus, blogsCorpus, twitterCorpus, profanityWords, file="1text.RData")
+} else{
+  load("1text.RData")
+}
+
+```
+
+
+```{r computingSummaryStats, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+if (!file.exists("1sumstats.RData")){
+  newsWords = stri_count_words(newsCorpus)
+  blogsWords = stri_count_words(blogsCorpus)
+  twitterWords = stri_count_words(twitterCorpus)
+  
+  newsTotalWords = sum(newsWords)
+  blogsTotalWords = sum(blogsWords)
+  twitterTotalWords = sum(twitterWords)
+  totalTotalWords = newsTotalWords + blogsTotalWords + twitterTotalWords
+  totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords, totalTotalWords)
+  
+  newsLines = length(newsWords)
+  blogsLines = length(blogsWords)
+  twitterLines = length(twitterWords)
+  totalLines = newsLines + blogsLines + twitterLines 
+  lines = c(blogsLines, newsLines, twitterLines, totalLines)
+  
+  newsMean = mean(newsWords)
+  blogsMean = mean(blogsWords)
+  twitterMean = mean(twitterWords)
+  totalMean = mean(c(newsWords, blogsMean, twitterMean))
+  means = c(blogsMean, newsMean, twitterMean, totalMean)
+  
+  newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
+  blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
+  twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
+  totalFileSize = newsFileSize + blogsFileSize + twitterFileSize
+  filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize, totalFileSize)
+  
+  dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile, "Total")
+  
+  summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words =   totalWords, lines = lines, mean_words = means)
+  save(summaryStats, totalWords, file="1sumstats.RData")
+} else {
+  load(file="1sumstats.RData")
+}
+
+  rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
+  rm(newsFileSize, newsLines, newsMean, newsTotalWords, newsWords)
+  rm(blogsFileSize, blogsLines, blogsMean, blogsTotalWords, blogsWords)
+  rm(twitterFileSize, twitterLines, twitterMean, twitterTotalWords, twitterWords)
+```
+When loading all of the english Corpora in the data file, we are actually loading around `r round(sum(totalWords)/10^6)` million words in `r round((length(newsCorpus)+length(blogsCorpus)+length(twitterCorpus))/10^6)` million lines. That's about four times the size of the Encyclopedia Britannica.        
+
+![15th edition of the Britannica._Wikipedia._](http://cdn.afterdawn.com/v3/news/600x400/220px-Encyclopaedia_Britannica_15_with_2002.jpg)          
+
+##Data Features and Summary Statistics     
+
+To get a better sense of the size of this data, the following summary statistics elaborates the main features of the corpora.     
+```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+summaryStats
+```
+
+##Data Sampling    
+Beacause the data size is too large which has resulted in many slowdowns and freezes in the computer while exploring the data, I have taken a sample  that constitutes 10% of the original data. 10% of each of the files downloaded for the english corpora, the number of lines of the sample is around 200,000 lines verses 2,000,000 lines for the original corpora.    
+
+```{r sampling, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+if (!file.exists("1samples.RData")){
+  newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
+  blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
+  twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
+  samples = c(newsSamples, blogsSamples, twitterSamples)
+#   length(samples)
+  save(samples, file= "1samples.RData")
+} else {
+  load("1samples.RData")
+}
+```
+
+```{r preCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+
+rm(newsSamples, blogsSamples, twitterSamples)
+rm(newsCorpus, blogsCorpus, twitterCorpus)
+rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
+rm(totalFileSize, totalLines, totalMean, totalTotalWords, totalWords)
+rm(dataFilenames, packages)
+rm(filesSizes, lines, means)
+rm(dataCorporaPath, dataFile, dataPath, dataURL, engPath, dataProfanityWordsPath, profanityWordsFile)
+```
+
+```{r creatingTMCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+if (!file.exists("1corpus1.RData")){
+  corpus = VCorpus(VectorSource(samples))
+  # inspect(corpus)
+  # length(corpus)
+  save(corpus, file="1corpus1.RData")
+} else {
+  load("1corpus1.RData")
+}
+```
+
+```{r postCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+rm(samples)
+rm(summaryStats)
+```
+## Data Cleaning
+Before delving into tokenization of the corpora, i.e. extracting the unique n-gram words or phrases,  we will clean the corpora through the following transofrmations:      
+  1- Converting the corpora text into UTF-8 encoding.    
+  2- Removing numbers.    
+  3- Removing unnecessary punctuation.    
+  4- Optionally removing English stopwords, we might cancel this step later as we progress as it       may affect the perfromance of our predictive model.     
+  5- Optionally removing profanity words, we might cancel this step later as we progress as it       may affect the perfromance of our predictive model. 
+  6- Converting all alphabetical characters into lowercase.    
+  7- Removing extra white space such as tab, etc...    
+  8- Stemming the different words, i.e. removing any suffixes such ing, er, s, etc...     
+  9- Converting the text into plain text document.     
+  
+```{r preprocessCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
+if (!file.exists("1corpus2.RData")){
+  corpus = tm_map(corpus, function(c) iconv(c, to="UTF-8", sub=" ") )
+  corpus = tm_map(corpus, removeNumbers) 
+  corpus = tm_map(corpus, removePunctuation)
+  corpus = tm_map(corpus, removeWords, stopwords("english"))
+  corpus = tm_map(corpus, removeWords, profanityWords)
+  corpus = tm_map(corpus, stripWhitespace)
+  corpus = tm_map(corpus, stemDocument)
+  corpus = tm_map(corpus, PlainTextDocument)
+  corpus = tm_map(corpus, content_transformer(tolower))
+  save(corpus, file= "1corpus2.RData")
+} else {
+  load(file = "1corpus2.RData")
+}
+```     
+
+## Corpora Tokenization     
+
+```{r computingTDM, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=2, max=2))
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=3, max=3))
+QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=4, max=4))
+
+getNGramFreqs <- function(tdm){
+    # Helper function to tabulate frequency
+    freqs <- sort(rowSums(as.matrix(tdm)), decreasing=TRUE)
+    NGramFreqs <- data.frame(word=names(freqs), frequency=freqs)
+    return(NGramFreqs)
+}
+if (!file.exists("1unigramFreqs.RData")){
+  unigramTDM_sparse <- TermDocumentMatrix(corpus)
+  unigramTDM <- removeSparseTerms(unigramTDM_sparse, 0.99)
+  rm(unigramTDM_sparse)
+  unigramFreqs <- getNGramFreqs(unigramTDM)
+  save(unigramFreqs, file= "1unigramFreqs.RData")
+} else {
+  load("1unigramFreqs.RData")
+}
+```      
+
+###Most Frequent Unigrams (1 word)       
+
+####Bigrams Word Cloud      
+The word cloud shows the most common unigrams larger in scale.      
+         
+```{r dUgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+# glimpse(unigramFreqs)
+wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud1.png", width=12, height=8, units="in", res=300)
+# wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=100, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```
+
+####Unigrams Histogram      
+The histogram shows the different frequencies of the top unigrams.   
+
+```{r dUgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+ggplot(unigramFreqs[1:30,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+  theme(axis.text.x=element_text(angle=65,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "Unigrams", title="Top 30 Unigrams Frequencies in The Copora")
+```      
+
+
+```{r cBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+if (!file.exists("1bigramFreqs.RData")){
+  bigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=BigramTokenizer))
+  bigramTDM <- removeSparseTerms(bigramTDM_sparse, 0.999)
+  rm(bigramTDM_sparse)
+  bigramFreqs <- getNGramFreqs(bigramTDM)
+  save(bigramFreqs, file = "1bigramFreqs.RData")
+} else {
+  load("1bigramFreqs.RData")
+}
+# glimpse(bigramFreqs)
+```
+
+###Most Frequent Bigrams (2 words)       
+
+####Bigrams Word Cloud      
+The word cloud shows the most common bigrams larger in scale.      
+         
+
+```{r dBgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud2.png", width=12, height=8, units="in", res=300)
+# wordcloud(bigramFreqs$word, bigramFreqs$frequency, scale=c(5,.1), max.words=200, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```
+
+####Bigrams Histogram      
+The histogram shows the different frequencies of the top bigrams.   
+
+```{r dBgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+ggplot(bigramFreqs[1:25,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+    theme(axis.text.x=element_text(angle=35,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "Bigrams", title="Top 25 Bigrams Frequencies in The Copora")
+```      
+
+```{r cTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+if (!file.exists("1trigramFreqs.RData")){
+  trigramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=TrigramTokenizer))
+  trigramTDM <- removeSparseTerms(trigramTDM_sparse, 0.9999)
+  rm(trigramTDM_sparse)
+  trigramFreqs <- getNGramFreqs(trigramTDM)
+  save(trigramFreqs, file = "1trigramFreqs.RData")
+  # glimpse(trigramFreqs)
+} else {
+  load("1trigramFreqs.RData")
+}
+```     
+
+###Most Frequent Trigrams (3 words)       
+
+####Trigrams Word Cloud      
+The word cloud shows the most common trigrams larger in scale.      
+
+```{r dTgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# png("MachineLearningCloud3.png", width=12, height=8, units="in", res=300)
+# wordcloud(trigramFreqs$word, trigramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
+# dev.off()
+```      
+
+####Trigrams Histogram      
+The histogram shows the different frequencies of the top trigrams.    
+
+```{r dTgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+ggplot(trigramFreqs[1:20,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_bw() +
+  theme(axis.text.x=element_text(angle=30,size=10,hjust=1))+
+#     theme(axis.title.y = element_text()) +
+    labs(y="Frequency", x= "Trigrams", title="Top 20 Trigrams Frequencies in The Copora")
+```      
+
+```{r cQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+if (!file.exists("1quadgramFreqs.RData")){
+  quadgramTDM_sparse <- TermDocumentMatrix(corpus, control=list(tokenize=QuadgramTokenizer))
+  quadgramTDM <- removeSparseTerms(quadgramTDM_sparse, 0.9999)
+  rm(quadgramTDM_sparse)
+  quadgramFreqs <- getNGramFreqs(quadgramTDM)
+  # glimpse(quadgramFreqs)
+  save(quadgramFreqs, file = "1quadgramFreqs.RData")
+} else {
+  load("1quadgramFreqs.RData")
+}
+```    
+
+###Most Frequent Quadgrams (4 words)       
+
+####Quadgrams Word Cloud      
+The word cloud shows the most common quadgrams larger in scale.     
+
+```{r dQgWc, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(2.0,.1),max.words=100, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE, rot.per = 0.35)
+# png("MachineLearningCloud4.png", width=12, height=8, units="in", res=300)
+# wordcloud(quadgramFreqs$word, quadgramFreqs$frequency, scale=c(5,.1), max.words=300, colors = brewer.pal(8, "Dark2"), random.order = TRUE, random.color = TRUE)
+# dev.off()
+```     
+
+####Quadgrams Histogram      
+The histogram shows the different frequencies of the top quadgrams.    
+
+```{r dQgHg, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+ggplot(quadgramFreqs[1:15,], aes(x=reorder(word,order(frequency, decreasing = TRUE)), y=frequency, fill=frequency)) +
+    geom_bar(stat="identity") +
+    theme_grey()+
+    theme(axis.text.x=element_text(angle=25,size=10,hjust=1))+
+    labs(y="Frequency", x= "Quadgrams", title="Top 15 Quadgrams Frequencies in The Copora")
+```      
+
+```{r postWcClean, echo=FALSE, results='markup', warning=FALSE, error=FALSE}
+quiz2Strings = c("The guy in front of me just bought a pound of bacon, a bouquet, and a case of",    "You're the reason why I smile everyday. Can you follow me please? It would mean the",                  "Hey sunshine, can you follow me and make me the", "Very early observations on the Bills game: Offense still struggling but the", "Go on a romantic date at the", "Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my", "Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some", "After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little", "Be grateful for the good times and keep the faith during the", "If this isn't the cutest thing you've ever seen, then you must be")
+length(quiz2Strings)
+
+
+quiz3Strings = c("",
+                 "",
+                 "",
+                 "",
+                 "",
+                 "",
+                 "",
+                 "",
+                 "",)
+quiz2Corpus = VCorpus(VectorSource(quiz2Strings))
+inspect(quiz2Corpus)
+quiz2Corpus[[2]]
+word(quiz2Strings[[2]], -3,-1)
+quiz2Corpus = tm_map(quiz2Corpus, function(c) iconv(c, to="UTF-8", sub=" ") )
+  quiz2Corpus = tm_map(quiz2Corpus, removeNumbers) 
+  quiz2Corpus = tm_map(quiz2Corpus, removePunctuation)
+  quiz2Corpus = tm_map(quiz2Corpus, removeWords, stopwords("english"))
+  quiz2Corpus = tm_map(quiz2Corpus, removeWords, profanityWords)
+  quiz2Corpus = tm_map(quiz2Corpus, stripWhitespace)
+  quiz2Corpus = tm_map(quiz2Corpus, stemDocument)
+  quiz2Corpus = tm_map(quiz2Corpus, PlainTextDocument)
+  quiz2Corpus = tm_map(quiz2Corpus, content_transformer(tolower))
+  inspect(quiz2Corpus)
+  quiz2Corpus[[1]]$content
+  
+  
+  recommend <- function (pattern) {
+    quadTest = word(pattern, -4,-2)
+    quadTest  
+    quadgramFreqs[which(str_detect(quadgramFreqs$word, fixed(quadTest)) == TRUE),]
+    
+    triTest = word(pattern, -3,-2)
+    triTest  
+    trigramFreqs[which(str_detect(trigramFreqs$word, fixed(triTest)) == TRUE),]
+  
+    biTest = word(pattern, -2,-2)
+    biTest  
+    bigramFreqs[which(str_detect(bigramFreqs$word, fixed(biTest)) == TRUE),]
+  }
+  
+  pattern1 = quiz2Corpus[[1]]$content
+  recommend(pattern1)
+
+  pattern2 = quiz2Corpus[[2]]$content
+  recommend(pattern2)
+
+  pattern3 = quiz2Corpus[[3]]$content
+  recommend(pattern3)
+
+  str(quiz2Corpus)
+  summary(quiz2Corpus)
+  
+  findFreqTerms(quadgramTDM, 2000)
+rm(corpus)
+```     
+#Shiny App    
+##Text Prediction Strategy     
+* Preprocessing a specific language corpora using the HC copora or augmenting it with other corpora.    
+* Building ngram models from 1 and upto maybe 5-7 words depending on the richness of the corpora.    
+* Building a table for the frequencies of each different ngram model.     
+* Merging the different tables into one consolidated frequency table for all the ngram models.    
+* Given a text string of n words, the prediction algorithm will match these words in any of the ngram tokens in the frequencies table, starting with the n+1 gram tokens, if it does not match any n+1 gram token, the last n-1 words of the input string is matched in the n gram tokens this time and the process continues until a match is found or the last word, i.e. 1 word of the input text is matched in one of unigram tokens.
+* If input is matched, the last word of the n+1 gram tokens with the highest frequencies are recommended for the user to complete his/her input text.     
+
+##Shiny App Plan     
+* Deciding on the optional cleaning steps to include in the final prediction model. For example, will the final model include stopwords and profanity words?    
+* Looking for augmentary english corpora that can be used to enhance the prediction to be built.      
+* Completing the n-gram model, I have already built the unigram, bigram, trigram, and quadgram models. However, I might be considering ngram models based on 5-7 words as well if the dataset provided is rich enough to enable me to extract these models.    
+* Deisgning and prototyping the user interface for the shiny app.     
+* Implementing the Shiny App.   
+* Documenting the App.
+* Developing a short pitch for the Shiny app.     
+
+#Conclusion      
+This document reports the main data features of the HC Copora downloaded from http://www.corpora.heliohost.org/. For each text file in the English copora,  the report shows the size in addition to other summary statistics such as, wordcount, number of lines, and the mean number of words per line. After building the unigram, bigram, trigram, and quadgram models, the report shows the most frequent n-gram words/tokens along with their frequency in the English Corpora. Finally, the report elaborates the text prediction strategy and the plan for the development of the Shiny App, the final product.     
