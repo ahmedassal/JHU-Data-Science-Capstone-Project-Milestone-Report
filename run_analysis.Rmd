@@ -10,14 +10,14 @@ output:
     fig_caption: yes
     number_sections: yes
 date: "Sunday, March 29, 2015"
----
-
+=======
 #Synopsis
 This report explains the explores the corpus, HC Corpora, from http://www.corpora.heliohost.org/ in preparation for the John Hopkins Data Science Capstone project. The project is a Shiny app that takes as input a phrase (multiple words) in a text box input and outputs a prediction of the next word. This document explains only the major features identified of the data including summary statistics about the data sets. It also reports any interesting findings that we amassed so far.
 
 In addition, the report elaborates our goals for the eventual app and algorithm and briefly summarize our plans for creating the prediction algorithm and Shiny app. It also serves as a basis for collecting feedback on our plans for creating a prediction algorithm and Shiny app.      
 
 #Data Processing   
+
 
 ##Loading packages    
 ```{r packageLoading, echo=FALSE, results='hide', warning=FALSE, error=FALSE, message=FALSE}
@@ -39,6 +39,32 @@ We used different R packages for producing report. More specifically:
 
 ##Downloading data
 [The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from www.corpora.heliohost.org . See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
+
+```{r dataDownloading, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
+dataURL = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+dataFile = "../../data/Coursera-SwiftKey.zip" 
+
+
+##Loading packages    
+```{r packageLoading, echo=FALSE, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+inst_pkgs = load_pkgs =  c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr")
+inst_pkgs = inst_pkgs[!(inst_pkgs %in% installed.packages()[,"Package"])]
+if(length(inst_pkgs)) install.packages(inst_pkgs)
+
+
+if(file.exists(dataFile)) {
+    message("File is already downloaded")
+} else {
+    download.file(dataURL, dataFile, method="wget")    
+}
+```
+We used different R packages for producing report. More specifically:         
+* For text manipulation, we used: `r load_pkgs[3:4]`    
+* For text mining, we used: `r load_pkgs[0:2]`    
+* For data visualization, we used: `r load_pkgs[6]`      
+
+##Downloading data
+[The HC Corpora](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip) where downloaded from [](www.corpora.heliohost.org). See the readme file at http://www.corpora.heliohost.org/aboutcorpus.html for details on the corpora available. The files have been language filtered but may still contain some foreign text.    
 
 ```{r dataDownloading, echo=FALSE, results='markup', warning=FALSE, error=FALSE, message=FALSE}
 dataURL = "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
@@ -66,6 +92,7 @@ list.files(paste0(dataPath, engPath))
 
 ##Loading data   
 
+
 ```{r loadingData, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
 dataProfanityWordsPath = "../../data/"
@@ -76,11 +103,21 @@ profanityWordsFile = "bad-words(CMU).txt"
 
 sampleSize = 0.01
 
+```{r, results='hide', cache=TRUE}
+dataCorporaPath = "../../data/Coursera-SwiftKey/final/en_US/"
+newsCorpusFile = "en_US.news.txt"
+blogsCorpusFile = "en_US.blogs.txt"
+twitterCorpusFile = "en_US.twitter.txt"
+
+sampleSize = 0.00001
+
+
 readLines2=function(fname) {
  s = file.info( fname )$size 
  buf = readChar( fname, s, useBytes=T)
  strsplit( buf,"\r\n",fixed=T,useBytes=T)[[1]]
 }
+
 
 if (!file.exists("1text.RData")){
   newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusFile))
@@ -163,6 +200,59 @@ if (!file.exists("1samples.RData")){
 } else {
   load("1samples.RData")
 }
+
+# if (!file.exists("corpora.RData")){
+  newsCorpus= readLines2(fname=paste0(dataCorporaPath, newsCorpusFile))
+  blogsCorpus= readLines2(fname=paste0(dataCorporaPath, blogsCorpusFile))
+  twitterCorpus= readLines2(fname=paste0(dataCorporaPath, twitterCorpusFile))
+#   save.image("corpora.RData")
+# } else{
+#   load("corpora.RData")
+# }
+```
+
+```{r summaryStats, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+newsWords = stri_count_words(newsCorpus)
+blogsWords = stri_count_words(blogsCorpus)
+twitterWords = stri_count_words(twitterCorpus)
+
+newsTotalWords = sum(newsWords)
+blogsTotalWords = sum(blogsWords)
+twitterTotalWords = sum(twitterWords)
+totalWords = c(blogsTotalWords, newsTotalWords, twitterTotalWords)
+
+newsLines = length(newsWords)
+blogsLines = length(blogsWords)
+twitterLines = length(twitterWords)
+lines = c(blogsLines, newsLines, twitterLines)
+
+newsMean = mean(newsWords)
+blogsMean = mean(blogsWords)
+twitterMean = mean(twitterWords)
+means = c(blogsMean, newsMean, twitterMean)
+
+newsFileSize  = file.info(paste0(dataCorporaPath, newsCorpusFile))$size / (1024^2)
+blogsFileSize  = file.info(paste0(dataCorporaPath, blogsCorpusFile))$size / (1024^2)
+twitterFileSize  = file.info(paste0(dataCorporaPath, twitterCorpusFile))$size / (1024^2)
+filesSizes = c(blogsFileSize, newsFileSize, twitterFileSize)
+
+dataFilenames = c(blogsCorpusFile, newsCorpusFile, twitterCorpusFile)
+
+summaryStats = data.frame(filename = dataFilenames, size_MB = filesSizes, total_words = totalWords, lines = lines, mean_words = means)
+
+summaryStats
+
+rm(newsCorpusFile, blogsCorpusFile, twitterCorpusFile)
+```
+
+```{r sampling, echo=FALSE, results='markup', warning=FALSE, error=FALSE, cache=TRUE}
+
+newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
+blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
+twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
+samples = c(newsSamples, blogsSamples, twitterSamples)
+length(samples)
+
 ```
 
 ```{r preCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
@@ -170,6 +260,7 @@ if (!file.exists("1samples.RData")){
 rm(newsSamples, blogsSamples, twitterSamples)
 rm(newsCorpus, blogsCorpus, twitterCorpus)
 rm(newsSamplesIndices, blogsSamplesIndices, twitterSamplesIndices)
+
 rm(totalFileSize, totalLines, totalMean, totalTotalWords, totalWords)
 rm(dataFilenames, packages)
 rm(filesSizes, lines, means)
@@ -185,10 +276,19 @@ if (!file.exists("1corpus1.RData")){
 } else {
   load("1corpus1.RData")
 }
+
+```
+
+```{r creatingTMCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+corpus = VCorpus(VectorSource(samples))
+# inspect(corpus)
+# length(corpus)
+
 ```
 
 ```{r postCorpusEnvCleaning, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
 rm(samples)
+
 rm(summaryStats)
 ```
 ## Data Cleaning
@@ -219,6 +319,7 @@ if (!file.exists("1corpus2.RData")){
   load(file = "1corpus2.RData")
 }
 ```     
+
 
 ## Corpora Tokenization     
 
@@ -256,6 +357,7 @@ wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=20
 # wordcloud(unigramFreqs$word, unigramFreqs$frequency, scale=c(5,.1), max.words=100, colors = brewer.pal(8, "Dark2"), random.order = TRUE)
 # dev.off()
 ```
+
 
 ####Unigrams Histogram      
 The histogram shows the different frequencies of the top unigrams.   
@@ -387,5 +489,20 @@ rm(corpus)
 ```     
 
 #Shiny App Strategy     
+
+
+```{r preprocessCorpus, echo=FALSE, results='hide', warning=FALSE, error=FALSE, cache=TRUE}
+corpus = tm_map(corpus, removeNumbers) 
+corpus = tm_map(corpus, removePunctuation)
+corpus = tm_map(corpus, content_transformer(tolower))
+corpus = tm_map(corpus, removeWords, stopwords("english"))
+# corpus = tm_map(corpus, removeWords, profanities)
+corpus = tm_map(corpus, stripWhitespace)
+corpus = tm_map(corpus, stemDocument)
+
+
+```
+
+#Results
 
 #Conclusion
