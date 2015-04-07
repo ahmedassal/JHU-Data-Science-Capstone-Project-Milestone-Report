@@ -28,7 +28,7 @@ In addition, the report elaborates our goals for the eventual app and algorithm 
 # 
 # # Dynamically load packages
 # pkgs_loaded = lapply(load_pkgs, require, character.only=T)
-source("G:/DEV/R/library/packages.R")
+source("G:/DEV/R/library/packages_management.R")
 
 packages = c("SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr", "wordcloud", "RColorBrewer")
 setup_packages(packages)
@@ -155,9 +155,9 @@ Beacause the data size is too large which has resulted in many slowdowns and fre
 
 ```{r sampling, echo=FALSE, results='hide', warning=FALSE, error=FALSE}
 if (!file.exists("1samples.RData")){
-  newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSize)
-  blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize)
-  twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize)
+  newsSamples = sample(newsCorpus, length(newsCorpus) * sampleSizem, replace = FALSE)
+  blogsSamples = sample(blogsCorpus, length(blogsCorpus) * sampleSize, replace = FALSE)
+  twitterSamples = sample(twitterCorpus, length(twitterCorpus) * sampleSize, replace = FALSE)
   samples = c(newsSamples, blogsSamples, twitterSamples)
 #   length(samples)
   save(samples, file= "1samples.RData")
